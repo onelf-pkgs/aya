@@ -89,7 +89,33 @@ file=build/src/AYA-$version-x86_64.AppImage
 if [ ! -f "$file" ]; then
     mkdir -p build/src
     url=$(toml sources.aya url | sed "s/{version}/$version/")
-    curl -fL --retry 3 --retry-all-errors -o "$file.part" "$url"
+    # The public asset URL 404s from GitHub's runner egress: the CDN
+    # throttles anonymous downloads of hot assets by IP class. The
+    # authenticated asset endpoint serves the same bytes without that
+    # throttle, so prefer it when the workflow hands us a token, and
+    # resolve its id from the release's asset list.
+    if [ -n "${GITHUB_TOKEN:-}" ]; then
+        api=$(echo "$url" | sed 's|github.com|api.github.com/repos|;
+            s|/releases/download/|/releases/tags/|; s|/[^/]*$||')
+        asset=$(echo "$url" | sed 's|.*/||')
+        id=$(curl -sf --retry 3 \
+                -H "Authorization: Bearer $GITHUB_TOKEN" "$api" |
+            awk -v RS='{' -v asset="$asset" \
+                'index($0, "\"name\": \"" asset "\"") &&
+                 match($0, /releases\/assets\/[0-9]+/) {
+                     print substr($0, RSTART + 16, RLENGTH - 16); exit
+                 }') || true
+        if [ -n "$id" ]; then
+            url=$(echo "$api" | sed 's|/releases/tags/|/releases/assets/|')/$id
+        fi
+    fi
+    if [ -n "${GITHUB_TOKEN:-}" ]; then
+        set -- -H "Authorization: Bearer $GITHUB_TOKEN"
+    else
+        set --
+    fi
+    curl -fL --retry 5 --retry-all-errors "$@" \
+        -H "Accept: application/octet-stream" -o "$file.part" "$url"
     mv "$file.part" "$file"
 fi
 echo "$(toml sources.aya sha256)  $file" | sha256sum -c - > /dev/null
