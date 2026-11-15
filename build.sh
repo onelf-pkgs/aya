@@ -89,7 +89,7 @@ file=build/src/AYA-$version-x86_64.AppImage
 if [ ! -f "$file" ]; then
     mkdir -p build/src
     url=$(toml sources.aya url | sed "s/{version}/$version/")
-    curl -fL --retry 3 -o "$file.part" "$url"
+    curl -fL --retry 3 --retry-all-errors -o "$file.part" "$url"
     mv "$file.part" "$file"
 fi
 echo "$(toml sources.aya sha256)  $file" | sha256sum -c - > /dev/null
