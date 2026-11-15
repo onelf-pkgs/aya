@@ -44,6 +44,10 @@ include = ["libX11-xcb.so.1"]
 exclude = ["libgbm"]
 no-gtk = true
 
+[compression]
+level = 22
+payload = "stipple"
+
 # GL for hosts whose own stack is missing or unusable, fetched and
 # verified at launch.
 [sysroot]
