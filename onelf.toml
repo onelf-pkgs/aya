@@ -12,12 +12,12 @@
 # the session through Ozone, on X11 or Wayland as the session offers.
 [package]
 name = "aya"
-command = "aya"
+command = "aya-run"
 version = "${AYA_VERSION}"
 description = "Android ADB desktop app"
 license = "AGPL-3.0"
 homepage = "https://aya.liriliri.io"
-working-dir = "inherit"
+working-dir = "command"
 exclude = ["onelf.toml"]
 
 # Chromium's Xlib-XCB glue dlopens libX11-xcb.so.1 by name; nothing

@@ -9,7 +9,6 @@ on hosts with no desktop stack installed, without FUSE.
 | | |
 |---|---|
 | Description | Android ADB desktop app |
-| Version | 1.14.2 |
 | Upstream | <https://github.com/liriliri/aya> |
 | License | AGPL-3.0 |
 
@@ -24,6 +23,10 @@ on hosts with no desktop stack installed, without FUSE.
   (libappindicator, libindicator, libgconf); the bundle updates itself
   from this repository's releases, unsigned until the control workflow
   commits a signing key.
+- Launches through a small script instead of the Electron binary: it
+  turns the Chromium sandbox off, which upstream's own desktop file
+  does as well, and names Wayland when the session offers it, so a
+  bare invocation works on X11 and Wayland alike.
 - Installs a desktop entry and icon through onelf's integration.
 - x86_64 only, like upstream's releases.
 

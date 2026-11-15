@@ -83,10 +83,10 @@ payload=$work/squashfs-root
 tree=$work/aya
 cp -a "$payload/." "$tree/"
 
-# The AppImage's own launcher, menu file and icon: the launcher is the
-# runtime's job, the menu file and the icon move into .onelf/ and
-# share/, and upstream's electron-updater config would fight the bundle
-# updating itself.
+# The AppImage's own launcher, menu file and icon: the launcher's job
+# is taken by the aya-run script below, and the menu file and the icon
+# move into .onelf/ and share/, and upstream's electron-updater config
+# would fight the bundle updating itself.
 rm "$tree/AppRun" "$tree/aya.desktop" "$tree/aya.png" \
     "$tree/resources/app-update.yml"
 
@@ -130,8 +130,27 @@ mkdir -p "$tree/.onelf/desktop" "$tree/.onelf/icons"
 cp desktop/aya.desktop "$tree/.onelf/desktop/aya.desktop"
 cp "$tree/share/icons/hicolor/512x512/apps/aya.png" "$tree/.onelf/icons/default.png"
 
+# The entrypoint is this launcher, not the Electron binary itself. The
+# Chromium sandbox needs unprivileged user namespaces or a SUID-root
+# helper, neither of which a pack can provide, so the app runs with it
+# off, exactly what upstream's own desktop file does (Exec=AppRun
+# --no-sandbox %U). Electron defaults to the X11 ozone platform, which
+# dies on a Wayland-only session with no XWayland, so the launcher
+# names Wayland when a Wayland socket is in the environment and lets
+# X11 stand otherwise. The launcher runs from the tree root, where
+# working-dir = command puts the cwd.
+cat > "$tree/aya-run" <<'EOF'
+#!/bin/sh
+if [ -n "${WAYLAND_DISPLAY:-}${WAYLAND_SOCKET:-}" ]; then
+    exec ./aya --no-sandbox --ozone-platform=wayland "$@"
+fi
+exec ./aya --no-sandbox "$@"
+EOF
+chmod 755 "$tree/aya-run"
+
 for needed in \
     "$tree/aya" \
+    "$tree/aya-run" \
     "$tree/resources/app.asar" \
     "$tree/resources/adb/adb" \
     "$tree/resources/scrcpy.jar" \
