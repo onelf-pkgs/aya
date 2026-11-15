@@ -1,0 +1,28 @@
+# The onelf recipe for the assembled tree: build.sh copies this into the
+# tree root beside the binary and exports what the ${...} placeholders
+# name, which onelf expands when it loads the recipe. Nothing here names
+# this machine or this architecture.
+#
+# Upstream's AppImage carries the Electron runtime, the app and adb, and
+# leans on the host for the entire desktop stack: GTK 3, NSS, cups, ALSA
+# and the X11 and Wayland libraries. The build container supplies it and
+# bundle-libs packs the closure into lib/, which is what lets the packed
+# file run on hosts without a desktop installed. Chromium renders through
+# the carried SwiftShader when the host has no GPU drivers, and talks to
+# the session through Ozone, on X11 or Wayland as the session offers.
+[package]
+name = "aya"
+command = "aya"
+version = "${AYA_VERSION}"
+description = "Android ADB desktop app"
+license = "AGPL-3.0"
+homepage = "https://aya.liriliri.io"
+working-dir = "inherit"
+exclude = ["onelf.toml"]
+
+# Chromium's Xlib-XCB glue dlopens libX11-xcb.so.1 by name; nothing
+# links it, so the scan cannot see it, and when the dlopen fails the
+# error path runs into a libc++ hardening assertion that kills the
+# process. The bundle carries the library instead.
+[bundle]
+include = ["libX11-xcb.so.1"]

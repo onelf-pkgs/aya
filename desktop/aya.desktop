@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=AYA
+Comment=Android adb desktop app
+Exec=aya --no-sandbox %U
+Icon=aya
+Terminal=false
+Categories=Utility;
+StartupWMClass=AYA
