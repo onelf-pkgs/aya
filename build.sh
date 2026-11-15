@@ -88,7 +88,7 @@ work=$PWD/build/work
 file=build/src/AYA-$version-x86_64.AppImage
 if [ ! -f "$file" ]; then
     mkdir -p build/src
-    url=$(toml sources.aya url | sed "s/{version}/$version/")
+    url=$(toml sources.aya url | sed "s/{version}/$version/g")
     curl -fL --retry 3 -o "$file.part" "$url"
     mv "$file.part" "$file"
 fi
