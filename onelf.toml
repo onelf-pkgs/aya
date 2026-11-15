@@ -1,15 +1,16 @@
-# The onelf recipe for the assembled tree: build.sh copies this into the
-# tree root beside the binary and exports what the ${...} placeholders
-# name, which onelf expands when it loads the recipe. Nothing here names
-# this machine or this architecture.
+# The onelf recipe for the assembled tree: build.sh copies this into
+# the tree root and exports what the ${...} placeholders name, which
+# onelf expands when it loads the recipe. Nothing here names this
+# machine or this architecture.
 #
 # Upstream's AppImage carries the Electron runtime, the app and adb, and
-# leans on the host for the entire desktop stack: GTK 3, NSS, cups, ALSA
-# and the X11 and Wayland libraries. The build container supplies it and
-# bundle-libs packs the closure into lib/, which is what lets the packed
-# file run on hosts without a desktop installed. Chromium renders through
-# the carried SwiftShader when the host has no GPU drivers, and talks to
-# the session through Ozone, on X11 or Wayland as the session offers.
+# leans on the host for the entire desktop stack. The pack carries the
+# libraries Chromium hard-links that no host ships complete: NSS, cups,
+# ALSA and the X11 and Wayland client libraries. The toolkit comes from
+# the shared gtk3 set at launch, and GL from the host or, on hosts
+# without one, from the pinned GL build. Chromium renders through its
+# own SwiftShader when there is no usable GPU driver, and talks to the
+# session through Ozone, on X11 or Wayland as the session offers.
 [package]
 name = "aya"
 command = "aya-run"
@@ -20,9 +21,38 @@ homepage = "https://aya.liriliri.io"
 working-dir = "command"
 exclude = ["onelf.toml"]
 
+# Every launch draws on the set: the window is GTK.
+[[entrypoint]]
+name = "aya"
+path = "aya-run"
+default = true
+sets = ["gtk3"]
+
 # Chromium's Xlib-XCB glue dlopens libX11-xcb.so.1 by name; nothing
 # links it, so the scan cannot see it, and when the dlopen fails the
 # error path runs into a libc++ hardening assertion that kills the
 # process. The bundle carries the library instead.
+#
+# libgbm is the opposite case: the Electron binary hard-links it, but
+# its gallium helper is dlopen'd under a versioned name the scan cannot
+# carry, so GBM's driver probe is loud wherever it fails. The library
+# stays out and is answered at launch by the host's GL stack or, on
+# hosts without one, by the pinned GL build; with neither, Chromium
+# falls back to the SwiftShader it carries.
 [bundle]
 include = ["libX11-xcb.so.1"]
+exclude = ["libgbm"]
+no-gtk = true
+
+# GL for hosts whose own stack is missing or unusable, fetched and
+# verified at launch.
+[sysroot]
+platform-url = "${GL_URL}"
+platform-hash = "${GL_BLAKE3}"
+
+# The toolkit is fetched at launch and shared with every other package
+# that pins it, so ten GTK applications carry none of it.
+[sysroot.sets.gtk3]
+packages = ["gtk+3"]
+url = "${GTK3_SET_URL}"
+blake3 = "${GTK3_SET_BLAKE3}"

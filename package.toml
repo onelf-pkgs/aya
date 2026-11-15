@@ -1,6 +1,8 @@
 # Aya for onelf: the Android ADB desktop app packed as one file,
-# carrying upstream's whole AppImage payload and the desktop stack
-# upstream leaves to the host.
+# carrying upstream's whole AppImage payload. Chromium's own
+# dependencies are packed from the build container; the GTK toolkit is
+# pinned to the shared gtk3 set and GL to the org's GL build, both
+# fetched at launch instead of carried.
 #
 # The control repository, onelf-pkgs/.github, bumps the sources here when
 # upstream releases and resets `release` to 1. Raise `release` by hand
@@ -15,3 +17,22 @@ version = "1.14.2"
 url = "https://github.com/liriliri/aya/releases/download/v{version}/AYA-{version}-linux-x86_64.AppImage"
 sha256 = "27ac157324191973c121250c1f2bbaeee8fbff626cffd309605a1b7c1c2f6967"
 upstream = { github = "liriliri/aya", tag = "^v([0-9.]+)$" }
+
+# The gtk3 set the interface runs on, pinned by the BLAKE3 of each
+# architecture's build, which the gtk release notes list. Bump the
+# three together.
+[sets.gtk3]
+version = "3.24.52-2"
+url = "https://github.com/onelf-pkgs/gtk/releases/download/v{version}/gtk3-{arch}.onelf"
+
+[sets.gtk3.blake3]
+x86_64 = "eadb7e22b8afff286414b648d29f0c3656707d35d7f2531c93cdefa5aba6bf3b"
+
+# The GL build fetched at launch on hosts whose own stack is missing,
+# from the org's LLVM-free Mesa. Bump the three together.
+[gl-build]
+version = "26.3.0-1"
+url = "https://github.com/onelf-pkgs/mesa/releases/download/v{version}/gl-{arch}.onelf"
+
+[gl-build.blake3]
+x86_64 = "22aefd1ea3a2ea229b0d9241c102c0e9735ae548de2449bf3b5f8ef5f974ea43"

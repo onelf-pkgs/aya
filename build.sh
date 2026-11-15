@@ -5,8 +5,10 @@
 #
 # Nothing is compiled: upstream's AppImage already carries the Electron
 # runtime, the app and its bundled adb; the recipe assembles them into
-# one tree, and the build container supplies the desktop stack upstream
-# leaves to the host. The bundle updates itself from the latest release,
+# one tree. Chromium's own dependencies come from the build container
+# into the bundle; the GTK toolkit comes from the shared gtk3 set at
+# launch, and GL from the host or the pinned GL build. The bundle
+# updates itself from the latest release,
 # accepting only updates signed with update.pub when the repository has
 # one, and unsigned ones until then.
 #
@@ -35,6 +37,24 @@ toml() {
 version=$(toml sources.aya version)
 release=$(sed -n 's/^release = //p' package.toml)
 
+# The desktop stack the pack pins instead of carrying: the gtk3 set
+# from the gtk repository and the GL build from the mesa repository,
+# both fetched and verified at launch.
+gtk3_set_version=$(toml sets.gtk3 version)
+gtk3_set_url=$(toml sets.gtk3 url | sed "s/{version}/$gtk3_set_version/; s/{arch}/$arch/")
+gtk3_set_blake3=$(toml sets.gtk3.blake3 "$arch")
+gl_version=$(toml gl-build version)
+gl_url=$(toml gl-build url | sed "s/{version}/$gl_version/; s/{arch}/$arch/")
+gl_blake3=$(toml gl-build.blake3 "$arch")
+if [ -z "$gtk3_set_blake3" ]; then
+    echo "the gtk3 set for $arch is not pinned yet; fill [sets.gtk3.blake3] from gtk v$gtk3_set_version" >&2
+    exit 1
+fi
+if [ -z "$gl_blake3" ]; then
+    echo "the GL build for $arch is not pinned yet; fill [gl-build.blake3] from mesa v$gl_version" >&2
+    exit 1
+fi
+
 # The runtime installs only a strictly newer revision, so a client is
 # never rolled back: 1.14.2 release 1 is 10014000001. awk reads Ventoy's
 # zero-padded parts, such as the 05 of 1.1.05, as decimal.
@@ -55,11 +75,14 @@ fi
 xbps-install -Syu xbps > /dev/null
 xbps-install -Syu > /dev/null
 xbps-install -y curl file findutils patchelf > /dev/null
-# Upstream's AppImage ships Electron, the app and adb, and leans on the
-# host for the entire desktop stack; the container supplies it so the
-# bundle does not have to trust the host.
-xbps-install -y gtk+3 nss cups alsa-lib dbus-libs wayland mesa libdrm \
-    at-spi2-core gdk-pixbuf libxkbcommon libXtst libXScrnSaver > /dev/null
+# Chromium's own dependencies; the container supplies them so the
+# bundle does not have to trust the host. The GTK stack is not
+# installed: the shared gtk3 set answers it at launch, and GL from the
+# pinned GL build. Chromium's own SwiftShader stays as the renderer
+# when neither answers.
+xbps-install -y nss cups alsa-lib dbus-libs wayland libdrm libxkbcommon \
+    libX11 libXcomposite libXdamage libXext libXfixes libXrandr \
+    libXcursor libXi libXtst libXScrnSaver > /dev/null
 
 work=$PWD/build/work
 file=build/src/AYA-$version-x86_64.AppImage
@@ -104,25 +127,23 @@ mv "$tree"/usr/lib/*.so* "$tree/lib/"
 mv "$tree/usr/share" "$tree/share"
 rmdir "$tree/usr/lib" "$tree/usr"
 
+# Chromium parses fontconfig configs with the copy of fontconfig it
+# bundles, which is older than Void's and prints a warning per rule it
+# cannot read. The three rules are optional aliases for generic font
+# families; the UI does not use them.
+rm -f "$tree"/share/fontconfig/conf.avail/48-guessfamily.conf \
+      "$tree"/share/fontconfig/conf.avail/49-sansserif.conf \
+      "$tree"/share/fontconfig/conf.avail/49-spacing.conf \
+      "$tree"/share/fontconfig/conf.d/48-guessfamily.conf \
+      "$tree"/share/fontconfig/conf.d/49-sansserif.conf \
+      "$tree"/share/fontconfig/conf.d/49-spacing.conf
+
 # Upstream ships the Electron binary with RPATH $ORIGIN, enough for its
 # own root-level libraries; the packed closure lives in lib, and onelf's
 # rewriter fills only an absent RPATH. Extend it here, so the binary
 # reaches both the libraries it ships beside itself and the ones the
 # container supplies.
 patchelf --set-rpath '$ORIGIN:$ORIGIN/lib' "$tree/aya"
-
-# GTK's image loaders load from a plugin directory the completeness
-# scan cannot infer; carrying them lets the runtime point
-# GDK_PIXBUF_MODULE_DIR at them. The cache file names the container's
-# paths, so it goes. Void ships no GIO modules; their omission is
-# optional, as the scan reports.
-cp -a /usr/lib/gdk-pixbuf-2.0 "$tree/lib/"
-find "$tree/lib/gdk-pixbuf-2.0" -name 'loaders.cache' -delete
-if [ -d /usr/lib/gio ]; then
-    cp -a /usr/lib/gio "$tree/lib/"
-fi
-mkdir -p "$tree/share/glib-2.0"
-cp -a /usr/share/glib-2.0/schemas "$tree/share/glib-2.0/schemas"
 
 # The menu entry and the icon, the way the recipe's integrate finds
 # them.
@@ -176,6 +197,10 @@ done
 # from this environment when onelf loads it. The update section names
 # this architecture's asset, so it is added here.
 export AYA_VERSION=$version
+export GTK3_SET_URL=$gtk3_set_url
+export GTK3_SET_BLAKE3=$gtk3_set_blake3
+export GL_URL=$gl_url
+export GL_BLAKE3=$gl_blake3
 cp onelf.toml "$tree/onelf.toml"
 cat >> "$tree/onelf.toml" <<EOF
 

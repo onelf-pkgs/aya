@@ -19,17 +19,17 @@ packed=dist/aya-$arch.onelf
 onelf verify "$packed"
 
 # The payload is upstream's Electron runtime, the app, adb and scrcpy;
-# the desktop stack the container supplied sits in lib; the launcher,
-# the updater config and the libraries that cannot resolve their own
-# dependencies must be gone.
+# Chromium's own libraries sit in lib and the toolkit comes from the
+# gtk3 set at launch; the launcher, the updater config and the
+# libraries that cannot resolve their own dependencies must be gone.
 list=$(onelf list "$packed")
 for path in aya resources/app.asar resources/adb/adb resources/scrcpy.jar \
     resources/aya.dex icudtl.dat resources.pak locales/en-US.pak \
-    lib/libgtk-3.so.0 lib/libnss3.so lib/libcups.so.2 lib/libasound.so.2 \
-    lib/libX11.so.6 lib/libgbm.so.1 lib/libwayland-client.so.0 \
+    lib/libnss3.so lib/libcups.so.2 lib/libasound.so.2 \
+    lib/libX11.so.6 lib/libwayland-client.so.0 \
     lib/libXss.so.1 lib/libXtst.so.6 lib/libnotify.so.4 \
     share/icons/hicolor/512x512/apps/aya.png \
-    lib/gdk-pixbuf-2.0 .onelf/desktop/aya.desktop .onelf/icons/default.png
+    .onelf/desktop/aya.desktop .onelf/icons/default.png
 do
     case $list in
     *"$path"*) : ;;
